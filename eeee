@@ -66,7 +66,7 @@ local radius = 50
 local speed = 2
 local angle = 0
 
--- ==================== CURRENCY TRACKER (Real-time + Session Gain) ====================
+-- ==================== CURRENCY TRACKER ====================
 local Fsys = require(game.ReplicatedStorage:WaitForChild("Fsys"))
 local ClientData = Fsys.load("ClientData")
 
@@ -151,19 +151,6 @@ local PetDropdown = AutofarmTab:CreateDropdown({
 
 AutofarmTab:CreateButton({Name = "Refresh Pets", Callback = UpdatePetDropdown})
 
--- ==================== MYSTERY PREFERENCE ====================
-AutofarmTab:CreateSection("Mystery Settings")
-local MysteryPreference = "Any"
-local MysteryDropdown = AutofarmTab:CreateDropdown({
-    Name = "Preferred Mystery Ailment",
-    Options = {"Any", "play", "ride", "walk", "salon", "school", "pizza_party", "beach_party", "camping", "bored", "pet_me"},
-    CurrentOption = {"Any"},
-    MultipleOptions = false,
-    Callback = function(Option)
-        MysteryPreference = Option[1]
-    end
-})
-
 AutofarmTab:CreateToggle({
     Name = "Pet Autofarm",
     CurrentValue = false,
@@ -191,9 +178,7 @@ AutofarmTab:CreateSection("Live Earnings Tracker (Current + Session Gain + Rate)
 local BucksLabel = AutofarmTab:CreateLabel("Bucks: Loading...", "info", nil, false)
 local PotionsLabel = AutofarmTab:CreateLabel("Age Potions: Loading...", "info", nil, false)
 
--- ==================== PLATFORM + HELPERS + WAIT FUNCTIONS + CIRCLE MOVEMENT (unchanged) ====================
--- (All the functions below are exactly as you sent them)
-
+-- ==================== PLATFORM + HELPERS ====================
 function updatePlatformForLocalPlayer()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
     local rootPart = LocalPlayer.Character.HumanoidRootPart
@@ -245,6 +230,7 @@ function UpdatePetDropdown()
     end
     PetDropdown:Refresh(PlayerPetsTabel, true)
 end
+
 function PetWait(Begin, Request, PetId)
     if Begin then
         local start = tick()
@@ -282,6 +268,7 @@ function BabyWait(Begin, Request)
         return true
     end
 end
+
 local function startMoving(state)
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local humanoid = character:WaitForChild("Humanoid")
@@ -310,7 +297,7 @@ local function startMoving(state)
     end
 end
 
--- ==================== DO PET NEED (MYSTERY NOW USES YOUR PREFERENCE + OFFICIAL LOGIC) ====================
+-- ==================== DO PET NEED ====================
 local DoPetNeed = {
     ["sleepy"] = function(PetId)
         AdoptMeConfigs.GoToMainMap()
@@ -537,9 +524,8 @@ local DoPetNeed = {
             LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0,5,0)
         end
         
-        -- FIXED: Equip pet ONCE and wait for model to fully load (this stops the equip/unequip spam)
         UpdatePlayerPets()
-        task.wait(1.2)  -- extra time so pet model stabilizes before stroller
+        task.wait(1.2)
         
         local StrollerId
         for i,v in pairs(AdoptMeConfigs.GetPlayersInventory().strollers) do
@@ -563,7 +549,7 @@ local DoPetNeed = {
             [1] = StrollerId,
             [2] = {equip_as_last = false, use_sound_delay = true}
         })
-        task.wait(1.5)  -- critical wait for stroller tool to appear
+        task.wait(1.5)
         
         local currentPet = AdoptMeConfigs.GetCurrentPet(PetId)
         if currentPet then
@@ -580,7 +566,7 @@ local DoPetNeed = {
                                     [1] = currentPet.base.pet_model.Parent,
                                     [2] = touchPart
                                 })
-                                task.wait(1.2)  -- let pet actually sit before walking
+                                task.wait(1.2)
                                 Notification("✅ Pet seated in stroller - ride started!")
                             end
                         end
@@ -643,67 +629,38 @@ local DoPetNeed = {
         startMoving(false)
     end,
 
-    ["mystery"] = function(PetId)
+    ["mystery"] = function(PetIdToDoNeed1, PetIdToDoNeed2)
         UpdatePlayerPets()
-        local petConfig = AdoptMeConfigs.GetPlayersPetConfigs(PetId)
-        if not petConfig then return end
-        
+        local NewMysteryAil = ""
         local PetArg = {
             is_pet = true,
-            pet_unique = PetId,
-            player = LocalPlayer,
-            pet_id = petConfig.petKind
+            pet_unique = PetIdToDoNeed1 or PetIdToDoNeed2,
+            player = game.Players.LocalPlayer,
+            pet_id = AdoptMeConfigs.GetPlayersPetConfigs(PetIdToDoNeed1 or PetIdToDoNeed2).petKind,
         }
-        
-        local oldiden
-        pcall(function() oldiden = getiden() setiden(2) end)
-        
-        local NewAil
-        pcall(function() NewAil = AilmentsClientRe.get_ailments_for_pet(PetArg) end)
-        
-        local GetAil
-        if NewAil and NewAil.mystery and NewAil.mystery.action and NewAil.mystery.action.options then
-            pcall(function()
-                GetAil = NewAil.mystery.action.options.get_ailment_slots(
-                    NewAil.mystery.action.options.random_seed,
-                    AilmentsClientRe.get_ailments_for_pet(PetArg),
-                    PetArg
-                )
-            end)
-        end
-        
-        pcall(function() if oldiden then setiden(oldiden) end end)
-        
-        local NewMysteryAil
-        if GetAil then
-            if MysteryPreference ~= "Any" then
-                for _, v in pairs(GetAil) do
-                    local val = tostring(v):lower()
-                    local pref = MysteryPreference:lower()
-                    if val == pref or val:find(pref) then
-                        NewMysteryAil = v
-                        break
-                    end
-                end
-            end
-            if not NewMysteryAil then
-                for i, v in pairs(GetAil) do
-                    if i == 1 then NewMysteryAil = v break end
-                end
+        local oldiden = getiden()
+        setiden(2)
+        local NewAil = AilmentsClientRe.get_ailments_for_pet(PetArg)
+        local GetAil = NewAil.mystery.action.options.get_ailment_slots(
+            NewAil.mystery.action.options.random_seed,
+            AilmentsClientRe.get_ailments_for_pet(PetArg),
+            PetArg
+        )
+        for i, v in pairs(GetAil) do
+            task.wait()
+            if i == 1 then
+                NewMysteryAil = v
+                break
             end
         end
-        
-        if NewMysteryAil then
-            AdoptMeConfigs.RunRouterClient(true, "AilmentsAPI/ChooseMysteryAilment", {
-                [1] = PetId, [2] = "mystery", [3] = 1, [4] = NewMysteryAil
-            })
-        else
-            AdoptMeConfigs.RunRouterClient(true, "AilmentsAPI/ChooseMysteryAilment", {
-                [1] = PetId, [2] = "mystery", [3] = 1, [4] = "play"
-            })
-            Notification("Mystery fallback used")
-        end
-        task.wait(1.5)
+        setiden(oldiden)
+        local args = {
+            [1] = PetIdToDoNeed1 or PetIdToDoNeed2,
+            [2] = "mystery",
+            [3] = 1,
+            [4] = NewMysteryAil,
+        }
+        AdoptMeConfigs.RunRouterClient(true, "AilmentsAPI/ChooseMysteryAilment", args)
     end,
 
     ["pet_me"] = function(PetId)
@@ -727,119 +684,119 @@ local DoPetNeed = {
 
 -- ==================== DO BABY NEED ====================
 local DoBabyNeed = {
-	["sleepy"] = function()
-		AdoptMeConfigs.GoToMainMap()
-		AdoptMeConfigs.GoToHome()
-		local CanStop = false
-		task.spawn(function() BabyWait(false, "sleepy") CanStop = true end)
-		task.spawn(function()
-			if not AdoptMeConfigs.GetFurniture("BasicCrib") and not CanStop then
-				AdoptMeConfigs.RunRouterClient(false, "HousingAPI/BuyFurnitures", {[1] = {[1] = {properties = {cframe = CFrame.new()}, kind = "basiccrib"}}})
-				AdoptMeConfigs.GoToMainMap() AdoptMeConfigs.GoToHome()
-			end
-			task.wait(0.5)
-			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and not CanStop then
-				AdoptMeConfigs.RunRouterClient(false, "HousingAPI/ActivateFurniture", {
-					[1] = LocalPlayer, [2] = AdoptMeConfigs.GetFurniture("BasicCrib"), [3] = "UseBlock",
-					[4] = {cframe = LocalPlayer.Character.HumanoidRootPart.CFrame}, [5] = LocalPlayer.Character
-				})
-			end
-		end)
-		repeat task.wait(0.1) until CanStop
-		AdoptMeConfigs.RunRouterClient(true, "AdoptAPI/ExitSeatStates", nil)
-	end,
-	["dirty"] = function()
-		AdoptMeConfigs.GoToMainMap()
-		AdoptMeConfigs.GoToHome()
-		local CanStop = false
-		task.spawn(function() BabyWait(false, "dirty") CanStop = true end)
-		task.spawn(function()
-			if not AdoptMeConfigs.GetFurniture("StylishShower") and not CanStop then
-				AdoptMeConfigs.RunRouterClient(false, "HousingAPI/BuyFurnitures", {[1] = {[1] = {properties = {cframe = CFrame.new()}, kind = "stylishshower"}}})
-				AdoptMeConfigs.GoToMainMap() AdoptMeConfigs.GoToHome()
-			end
-			task.wait(0.5)
-			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and not CanStop then
-				AdoptMeConfigs.RunRouterClient(false, "HousingAPI/ActivateFurniture", {
-					[1] = LocalPlayer, [2] = AdoptMeConfigs.GetFurniture("StylishShower"), [3] = "UseBlock",
-					[4] = {cframe = LocalPlayer.Character.HumanoidRootPart.CFrame}, [5] = LocalPlayer.Character
-				})
-			end
-		end)
-		repeat task.wait(0.1) until CanStop
-		AdoptMeConfigs.RunRouterClient(true, "AdoptAPI/ExitSeatStates", nil)
-	end,
-	["thirsty"] = function()
-		local args = { [1] = "food", [2] = "water", [3] = {buy_count = 1} }
-		AdoptMeConfigs.RunRouterClient(false, "ShopAPI/BuyItem", args)
-		local FoodId
-		for i,v in pairs(AdoptMeConfigs.GetPlayersInventory().food) do if v.id == "water" then FoodId = i end end
-		task.wait(0.5) if not FoodId then return end
-		AdoptMeConfigs.RunRouterClient(false, "ToolAPI/Equip", {[1]=FoodId,[2]={equip_as_last=false,use_sound_delay=true}})
-		task.wait(0.5)
-		for i=1,8 do
-			AdoptMeConfigs.RunRouterClient(true, "ToolAPI/ServerUseTool", {[1]=FoodId,[2]="END"})
-			task.wait(0.3)
-		end
-	end,
-	["hungry"] = function()
-		local args = { [1] = "food", [2] = "teachers_apple", [3] = {buy_count = 1} }
-		AdoptMeConfigs.RunRouterClient(false, "ShopAPI/BuyItem", args)
-		local FoodId
-		for i,v in pairs(AdoptMeConfigs.GetPlayersInventory().food) do if v.id == "teachers_apple" then FoodId = i end end
-		task.wait(0.5) if not FoodId then return end
-		AdoptMeConfigs.RunRouterClient(false, "ToolAPI/Equip", {[1]=FoodId,[2]={equip_as_last=false,use_sound_delay=true}})
-		task.wait(0.5)
-		for i=1,3 do
-			AdoptMeConfigs.RunRouterClient(true, "ToolAPI/ServerUseTool", {[1]=FoodId,[2]="END"})
-			task.wait(0.3)
-		end
-	end,
-	["sick"] = function()
-		AdoptMeConfigs.GoToStore("Hospital")
-		local CanStop = false
-		task.spawn(function() BabyWait(false, "sick") CanStop = true end)
-		task.spawn(function()
-			while not CanStop do
-				task.wait(1)
-				AdoptMeConfigs.RunRouterClient(false, "HousingAPI/ActivateInteriorFurniture", {
-					[1] = AdoptMeConfigs.GetFurniture("Doctor"), [2] = "UseBlock", [3] = "Yes", [4] = LocalPlayer.Character
-				})
-			end
-		end)
-		repeat task.wait(0.1) until CanStop
-	end,
-	["salon"] = function()
-		AdoptMeConfigs.GoToStore("Salon")
-		LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0,5,0)
-		BabyWait(false, "salon")
-	end,
-	["bored"] = function()
-		AdoptMeConfigs.GoToMainMap()
-		LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-416.258881, 35.9008026, -1755.65979)
-		BabyWait(false, "bored")
-	end,
-	["camping"] = function()
-		AdoptMeConfigs.GoToMainMap()
-		LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.Interiors:FindFirstChildWhichIsA("Model"):GetModelCFrame():ToWorldSpace(CFrame.new(0,0,-6))
-		LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-13.1087923, 35.8056011, -1051.61743)
-		BabyWait(false, "camping")
-	end,
-	["beach_party"] = function()
-		AdoptMeConfigs.GoToMainMap()
-		LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-543.437134, 35.4161434, -1479.17554)
-		BabyWait(false, "beach_party")
-	end,
-	["pizza_party"] = function()
-		AdoptMeConfigs.GoToStore("PizzaShop")
-		LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0,5,0)
-		BabyWait(false, "pizza_party")
-	end,
-	["school"] = function()
-		AdoptMeConfigs.GoToStore("School")
-		LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0,5,0)
-		BabyWait(false, "school")
-	end,
+    ["sleepy"] = function()
+        AdoptMeConfigs.GoToMainMap()
+        AdoptMeConfigs.GoToHome()
+        local CanStop = false
+        task.spawn(function() BabyWait(false, "sleepy") CanStop = true end)
+        task.spawn(function()
+            if not AdoptMeConfigs.GetFurniture("BasicCrib") and not CanStop then
+                AdoptMeConfigs.RunRouterClient(false, "HousingAPI/BuyFurnitures", {[1] = {[1] = {properties = {cframe = CFrame.new()}, kind = "basiccrib"}}})
+                AdoptMeConfigs.GoToMainMap() AdoptMeConfigs.GoToHome()
+            end
+            task.wait(0.5)
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and not CanStop then
+                AdoptMeConfigs.RunRouterClient(false, "HousingAPI/ActivateFurniture", {
+                    [1] = LocalPlayer, [2] = AdoptMeConfigs.GetFurniture("BasicCrib"), [3] = "UseBlock",
+                    [4] = {cframe = LocalPlayer.Character.HumanoidRootPart.CFrame}, [5] = LocalPlayer.Character
+                })
+            end
+        end)
+        repeat task.wait(0.1) until CanStop
+        AdoptMeConfigs.RunRouterClient(true, "AdoptAPI/ExitSeatStates", nil)
+    end,
+    ["dirty"] = function()
+        AdoptMeConfigs.GoToMainMap()
+        AdoptMeConfigs.GoToHome()
+        local CanStop = false
+        task.spawn(function() BabyWait(false, "dirty") CanStop = true end)
+        task.spawn(function()
+            if not AdoptMeConfigs.GetFurniture("StylishShower") and not CanStop then
+                AdoptMeConfigs.RunRouterClient(false, "HousingAPI/BuyFurnitures", {[1] = {[1] = {properties = {cframe = CFrame.new()}, kind = "stylishshower"}}})
+                AdoptMeConfigs.GoToMainMap() AdoptMeConfigs.GoToHome()
+            end
+            task.wait(0.5)
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and not CanStop then
+                AdoptMeConfigs.RunRouterClient(false, "HousingAPI/ActivateFurniture", {
+                    [1] = LocalPlayer, [2] = AdoptMeConfigs.GetFurniture("StylishShower"), [3] = "UseBlock",
+                    [4] = {cframe = LocalPlayer.Character.HumanoidRootPart.CFrame}, [5] = LocalPlayer.Character
+                })
+            end
+        end)
+        repeat task.wait(0.1) until CanStop
+        AdoptMeConfigs.RunRouterClient(true, "AdoptAPI/ExitSeatStates", nil)
+    end,
+    ["thirsty"] = function()
+        local args = { [1] = "food", [2] = "water", [3] = {buy_count = 1} }
+        AdoptMeConfigs.RunRouterClient(false, "ShopAPI/BuyItem", args)
+        local FoodId
+        for i,v in pairs(AdoptMeConfigs.GetPlayersInventory().food) do if v.id == "water" then FoodId = i end end
+        task.wait(0.5) if not FoodId then return end
+        AdoptMeConfigs.RunRouterClient(false, "ToolAPI/Equip", {[1]=FoodId,[2]={equip_as_last=false,use_sound_delay=true}})
+        task.wait(0.5)
+        for i=1,8 do
+            AdoptMeConfigs.RunRouterClient(true, "ToolAPI/ServerUseTool", {[1]=FoodId,[2]="END"})
+            task.wait(0.3)
+        end
+    end,
+    ["hungry"] = function()
+        local args = { [1] = "food", [2] = "teachers_apple", [3] = {buy_count = 1} }
+        AdoptMeConfigs.RunRouterClient(false, "ShopAPI/BuyItem", args)
+        local FoodId
+        for i,v in pairs(AdoptMeConfigs.GetPlayersInventory().food) do if v.id == "teachers_apple" then FoodId = i end end
+        task.wait(0.5) if not FoodId then return end
+        AdoptMeConfigs.RunRouterClient(false, "ToolAPI/Equip", {[1]=FoodId,[2]={equip_as_last=false,use_sound_delay=true}})
+        task.wait(0.5)
+        for i=1,3 do
+            AdoptMeConfigs.RunRouterClient(true, "ToolAPI/ServerUseTool", {[1]=FoodId,[2]="END"})
+            task.wait(0.3)
+        end
+    end,
+    ["sick"] = function()
+        AdoptMeConfigs.GoToStore("Hospital")
+        local CanStop = false
+        task.spawn(function() BabyWait(false, "sick") CanStop = true end)
+        task.spawn(function()
+            while not CanStop do
+                task.wait(1)
+                AdoptMeConfigs.RunRouterClient(false, "HousingAPI/ActivateInteriorFurniture", {
+                    [1] = AdoptMeConfigs.GetFurniture("Doctor"), [2] = "UseBlock", [3] = "Yes", [4] = LocalPlayer.Character
+                })
+            end
+        end)
+        repeat task.wait(0.1) until CanStop
+    end,
+    ["salon"] = function()
+        AdoptMeConfigs.GoToStore("Salon")
+        LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0,5,0)
+        BabyWait(false, "salon")
+    end,
+    ["bored"] = function()
+        AdoptMeConfigs.GoToMainMap()
+        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-416.258881, 35.9008026, -1755.65979)
+        BabyWait(false, "bored")
+    end,
+    ["camping"] = function()
+        AdoptMeConfigs.GoToMainMap()
+        LocalPlayer.Character.HumanoidRootPart.CFrame = workspace.Interiors:FindFirstChildWhichIsA("Model"):GetModelCFrame():ToWorldSpace(CFrame.new(0,0,-6))
+        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-13.1087923, 35.8056011, -1051.61743)
+        BabyWait(false, "camping")
+    end,
+    ["beach_party"] = function()
+        AdoptMeConfigs.GoToMainMap()
+        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-543.437134, 35.4161434, -1479.17554)
+        BabyWait(false, "beach_party")
+    end,
+    ["pizza_party"] = function()
+        AdoptMeConfigs.GoToStore("PizzaShop")
+        LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0,5,0)
+        BabyWait(false, "pizza_party")
+    end,
+    ["school"] = function()
+        AdoptMeConfigs.GoToStore("School")
+        LocalPlayer.Character.HumanoidRootPart.CFrame += Vector3.new(0,5,0)
+        BabyWait(false, "school")
+    end,
 }
 
 -- ==================== MAIN FARM ====================
