@@ -133,7 +133,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 	if gameProcessed then return end
 
-	if input.KeyCode == Enum.KeyCode.F then
+	if input.KeyCode == Enum.KeyCode.R then
 
 		running = not running
 
@@ -148,4 +148,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 end)
 
-debugPrint("Script Loaded - Press F to toggle farm")
+debugPrint("Script Loaded - Press R to toggle farm")
