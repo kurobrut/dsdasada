@@ -1,6 +1,5 @@
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = game.Players.LocalPlayer
 
 local net = ReplicatedStorage:WaitForChild("adoptme_new_net")
 
@@ -8,15 +7,15 @@ local marshmallowEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Su
 local collectEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Sugarfest2026.ChocolateRiver.ChocolateRiverNet:14")
 
 -------------------------------------------------
--- DEBUG SYSTEM
+-- DEBUG
 -------------------------------------------------
 
-local function debugPrint(msg)
-	print("[MARSHMALLOW DEBUG] "..msg)
+local function debug(msg)
+	print("[MARSHMALLOW] "..msg)
 end
 
 -------------------------------------------------
--- MARSHMALLOW IDS
+-- IDS
 -------------------------------------------------
 
 local marshmallowIds = {
@@ -60,92 +59,78 @@ local marshmallowIds = {
 -- FUNCTIONS
 -------------------------------------------------
 
-local function sendMarshmallowBatch()
+local function sendMarshmallows()
 
-	debugPrint("Sending marshmallow batch...")
+	debug("Sending marshmallows...")
 
-	local args = {
-		{
+	pcall(function()
+		marshmallowEvent:FireServer({
 			interior_name = "MainMap!Sugarfest2026",
 			marshmallow_ids = marshmallowIds
-		}
-	}
-
-	local success, err = pcall(function()
-		marshmallowEvent:FireServer(unpack(args))
+		})
 	end)
 
-	if success then
-		debugPrint("Sent "..#marshmallowIds.." marshmallows")
-	else
-		debugPrint("Send failed -> "..tostring(err))
-	end
+	debug("Marshmallows sent")
 
 end
 
-local function collectMarshmallows()
+local function collect()
 
-	debugPrint("Collecting marshmallows...")
+	debug("Collecting...")
 
-	local success, err = pcall(function()
+	local success = pcall(function()
 		collectEvent:FireServer()
 	end)
 
 	if success then
-		debugPrint("Collection successful")
+		debug("Collected")
 	else
-		debugPrint("Collect failed -> "..tostring(err))
+		debug("Collect failed")
 	end
 
 end
 
 -------------------------------------------------
--- LOOP SYSTEM
+-- LOOP
 -------------------------------------------------
 
 local running = false
 
-local function farmLoop()
-
-	debugPrint("Auto Farm Started")
+local function farm()
 
 	while running do
 
-		sendMarshmallowBatch()
-
+		sendMarshmallows()
 		task.wait(0.5)
 
-		collectMarshmallows()
-
+		collect()
 		task.wait(1)
 
 	end
 
-	debugPrint("Auto Farm Stopped")
-
 end
 
 -------------------------------------------------
--- KEYBIND (PRESS F)
+-- KEYBIND (F)
 -------------------------------------------------
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
+UserInputService.InputBegan:Connect(function(input, processed)
 
-	if gameProcessed then return end
+	if processed then return end
 
 	if input.KeyCode == Enum.KeyCode.R then
 
 		running = not running
 
 		if running then
-			debugPrint("Key pressed -> Farm Enabled")
-			task.spawn(farmLoop)
+			debug("Farm started")
+			task.spawn(farm)
 		else
-			debugPrint("Key pressed -> Farm Disabled")
+			debug("Farm stopped")
 		end
 
 	end
 
 end)
 
-debugPrint("Script Loaded - Press R to toggle farm")
+debug("Script loaded | Press R to start")
