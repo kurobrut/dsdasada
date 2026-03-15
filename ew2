@@ -8,7 +8,15 @@ local marshmallowEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Su
 local collectEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Sugarfest2026.ChocolateRiver.ChocolateRiverNet:14")
 
 -------------------------------------------------
--- MARSHMALLOW IDS (keep your full list here)
+-- DEBUG SYSTEM
+-------------------------------------------------
+
+local function debugPrint(msg)
+	print("[MARSHMALLOW DEBUG] "..msg)
+end
+
+-------------------------------------------------
+-- MARSHMALLOW IDS
 -------------------------------------------------
 
 local marshmallowIds = {
@@ -54,6 +62,8 @@ local marshmallowIds = {
 
 local function sendMarshmallowBatch()
 
+	debugPrint("Sending marshmallow batch...")
+
 	local args = {
 		{
 			interior_name = "MainMap!Sugarfest2026",
@@ -61,17 +71,31 @@ local function sendMarshmallowBatch()
 		}
 	}
 
-	pcall(function()
+	local success, err = pcall(function()
 		marshmallowEvent:FireServer(unpack(args))
 	end)
+
+	if success then
+		debugPrint("Sent "..#marshmallowIds.." marshmallows")
+	else
+		debugPrint("Send failed -> "..tostring(err))
+	end
 
 end
 
 local function collectMarshmallows()
 
-	pcall(function()
+	debugPrint("Collecting marshmallows...")
+
+	local success, err = pcall(function()
 		collectEvent:FireServer()
 	end)
+
+	if success then
+		debugPrint("Collection successful")
+	else
+		debugPrint("Collect failed -> "..tostring(err))
+	end
 
 end
 
@@ -82,6 +106,8 @@ end
 local running = false
 
 local function farmLoop()
+
+	debugPrint("Auto Farm Started")
 
 	while running do
 
@@ -94,6 +120,8 @@ local function farmLoop()
 		task.wait(1)
 
 	end
+
+	debugPrint("Auto Farm Stopped")
 
 end
 
@@ -110,12 +138,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		running = not running
 
 		if running then
-			print("Marshmallow Farm: ON")
+			debugPrint("Key pressed -> Farm Enabled")
 			task.spawn(farmLoop)
 		else
-			print("Marshmallow Farm: OFF")
+			debugPrint("Key pressed -> Farm Disabled")
 		end
 
 	end
 
 end)
+
+debugPrint("Script Loaded - Press F to toggle farm")
