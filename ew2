@@ -1,37 +1,14 @@
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-
-local Window = Rayfield:CreateWindow({
-	Name = "Sugarfest Marshmallow Farm 🍡",
-	LoadingTitle = "Chocolate River",
-	LoadingSubtitle = "Auto Collector",
-	ConfigurationSaving = {
-		Enabled = false
-	}
-})
-
-local Tab = Window:CreateTab("Marshmallows", 4483362458)
-local DebugTab = Window:CreateTab("Debug", 4483362458)
-
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = game.Players.LocalPlayer
+
 local net = ReplicatedStorage:WaitForChild("adoptme_new_net")
 
 local marshmallowEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Sugarfest2026.ChocolateRiver.ChocolateRiverNet:6")
 local collectEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Sugarfest2026.ChocolateRiver.ChocolateRiverNet:14")
 
 -------------------------------------------------
--- DEBUG SYSTEM
--------------------------------------------------
-
-local debugLabel = DebugTab:CreateLabel("Debug Ready")
-
-local function debugPrint(msg)
-	print("[MARSHMALLOW DEBUG] "..msg)
-	debugLabel:Set(msg)
-end
-
--------------------------------------------------
--- MARSHMALLOW IDS
+-- MARSHMALLOW IDS (keep your full list here)
 -------------------------------------------------
 
 local marshmallowIds = {
@@ -72,7 +49,7 @@ local marshmallowIds = {
 }
 
 -------------------------------------------------
--- REMOTE FUNCTIONS
+-- FUNCTIONS
 -------------------------------------------------
 
 local function sendMarshmallowBatch()
@@ -84,101 +61,61 @@ local function sendMarshmallowBatch()
 		}
 	}
 
-	local success, err = pcall(function()
+	pcall(function()
 		marshmallowEvent:FireServer(unpack(args))
 	end)
-
-	if success then
-		debugPrint("Sent "..#marshmallowIds.." marshmallows")
-	else
-		debugPrint("Send failed -> "..tostring(err))
-	end
 
 end
 
 local function collectMarshmallows()
 
-	local success, err = pcall(function()
+	pcall(function()
 		collectEvent:FireServer()
 	end)
 
-	if success then
-		debugPrint("Collected rewards")
-	else
-		debugPrint("Collect failed -> "..tostring(err))
+end
+
+-------------------------------------------------
+-- LOOP SYSTEM
+-------------------------------------------------
+
+local running = false
+
+local function farmLoop()
+
+	while running do
+
+		sendMarshmallowBatch()
+
+		task.wait(0.5)
+
+		collectMarshmallows()
+
+		task.wait(1)
+
 	end
 
 end
 
 -------------------------------------------------
--- AUTO FARM SYSTEM
+-- KEYBIND (PRESS F)
 -------------------------------------------------
 
-local isRunning = false
-local farmThread = nil
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
-Tab:CreateToggle({
-	Name = "🍡 Auto Farm Marshmallows",
-	CurrentValue = false,
-	Callback = function(Value)
+	if gameProcessed then return end
 
-		isRunning = Value
+	if input.KeyCode == Enum.KeyCode.F then
 
-		if isRunning then
+		running = not running
 
-			if farmThread then return end
-
-			farmThread = task.spawn(function()
-
-				debugPrint("Auto Farm Started")
-
-				while isRunning do
-
-					sendMarshmallowBatch()
-
-					task.wait(0.5)
-
-					collectMarshmallows()
-
-					task.wait(1)
-
-				end
-
-				debugPrint("Auto Farm Stopped")
-
-				farmThread = nil
-
-			end)
-
-		end
-	end
-})
-
--------------------------------------------------
--- MANUAL BUTTONS
--------------------------------------------------
-
-Tab:CreateButton({
-	Name = "Claim Marshmallows",
-	Callback = function()
-
-		debugPrint("Manual Claim")
-
-		sendMarshmallowBatch()
-
-	end
-})
-
-Tab:CreateButton({
-	Name = "Collect Marshmallows",
-	Callback = function()
-
-		debugPrint("Manual Collect")
-
-		for i = 1,5 do
-			collectMarshmallows()
-			task.wait(0.3)
+		if running then
+			print("Marshmallow Farm: ON")
+			task.spawn(farmLoop)
+		else
+			print("Marshmallow Farm: OFF")
 		end
 
 	end
-})
+
+end)
