@@ -7,14 +7,6 @@ local marshmallowEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Su
 local collectEvent = net:WaitForChild("adoptme_legacy_shared.ContentPacks.Sugarfest2026.ChocolateRiver.ChocolateRiverNet:14")
 
 -------------------------------------------------
--- DEBUG
--------------------------------------------------
-
-local function debug(msg)
-	print("[MARSHMALLOW] "..msg)
-end
-
--------------------------------------------------
 -- IDS
 -------------------------------------------------
 
@@ -61,8 +53,6 @@ local marshmallowIds = {
 
 local function sendMarshmallows()
 
-	debug("Sending marshmallows...")
-
 	pcall(function()
 		marshmallowEvent:FireServer({
 			interior_name = "MainMap!Sugarfest2026",
@@ -70,23 +60,13 @@ local function sendMarshmallows()
 		})
 	end)
 
-	debug("Marshmallows sent")
-
 end
 
 local function collect()
 
-	debug("Collecting...")
-
 	local success = pcall(function()
 		collectEvent:FireServer()
 	end)
-
-	if success then
-		debug("Collected")
-	else
-		debug("Collect failed")
-	end
 
 end
 
@@ -121,13 +101,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if input.KeyCode == Enum.KeyCode.R then
 
 		running = not running
-
-		if running then
-			debug("Farm started")
-			task.spawn(farm)
-		else
-			debug("Farm stopped")
-		end
 
 	end
 
