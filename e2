@@ -55,27 +55,28 @@ local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
 local function loadIDs()
 	local success, result = pcall(function()
-		return game:HttpGet("https://raw.githubusercontent.com/kurobrut/dsdasada/refs/heads/main/mallow.lua")
+		return game:HttpGet("https://raw.githubusercontent.com/kurobrut/dsdasada/main/mallow.lua")
 	end)
 
-	if success then
+	if not success then
+		debug("Failed to load IDs (HTTP error)")
+		return
+	end
+
 	local ok, data = pcall(function()
 		return loadstring(result)()
 	end)
 
-	if ok and typeof(data) == "table" and #data > 0 then
+	if ok and typeof(data) == "table" and next(data) then
 		marshmallowIds = data
-		debug("Loaded IDs: "..#data)
+		debug("Loaded IDs: " .. #marshmallowIds)
 	else
 		debug("Invalid ID data")
 	end
-	else
-		debug("Failed to load IDs")
-	end
 end
 
-
 loadIDs()
+
 
 -- ==================== MARSHMALLOW FUNCTIONS ====================
 
