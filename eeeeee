@@ -95,15 +95,17 @@ end
 -------------------------------------------------
 
 UserInputService.InputBegan:Connect(function(input, processed)
-
 	if processed then return end
 
 	if input.KeyCode == Enum.KeyCode.R then
-
 		running = not running
 
+		if running then
+			task.spawn(farm)
+		end
 	end
-
 end)
 
-debug("Script loaded | Press R to start")
+
+print("Script loaded | Press R to start")
+
