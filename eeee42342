@@ -1,4 +1,4 @@
--- Mochi Stump AutoFarm (EXECUTE FIXED)
+-- Mochi Stump AutoFarm (FULL AUTO + AUTO BUY SPAM)
 
 -------------------------------------------------
 -- WAIT FOR GAME
@@ -25,7 +25,7 @@ LP.Idled:Connect(function()
 end)
 
 -------------------------------------------------
--- WAIT FOR FSYS
+-- LOAD FSYS SAFE
 -------------------------------------------------
 local Fsys
 repeat
@@ -39,7 +39,7 @@ local ClientData = Fsys.load("ClientData")
 local RouterClient = Fsys.load("RouterClient")
 
 -------------------------------------------------
--- WAIT FOR NAIL HELPER
+-- LOAD NAIL HELPER
 -------------------------------------------------
 local NailHelper
 repeat
@@ -54,7 +54,7 @@ repeat
 until NailHelper
 
 -------------------------------------------------
--- WAIT FOR REMOTE
+-- LOAD REMOTE
 -------------------------------------------------
 local hitRemote
 repeat
@@ -66,22 +66,26 @@ repeat
 until hitRemote
 
 -------------------------------------------------
--- SETTINGS
+-- AUTO BUY SPAM (UNTIL NO MONEY)
 -------------------------------------------------
-local malletAmount = 5
+task.spawn(function()
+    while true do
+        task.wait(0.5)
 
--------------------------------------------------
--- BUY MALLET
--------------------------------------------------
-local function buyMallet(amount)
-    pcall(function()
-        RouterClient.get("ShopAPI/BuyItem"):InvokeServer(
-            "gifts",
-            "sugarfest_2026_mochi_mallet",
-            { buy_count = amount }
-        )
-    end)
-end
+        pcall(function()
+            local result = RouterClient.get("ShopAPI/BuyItem"):InvokeServer(
+                "gifts",
+                "sugarfest_2026_mochi_mallet",
+                { buy_count = 1 }
+            )
+
+            -- if can't buy, slow down retry
+            if result ~= "success" then
+                task.wait(3)
+            end
+        end)
+    end
+end)
 
 -------------------------------------------------
 -- GET MALLET
@@ -128,21 +132,16 @@ local function getNextStump()
 end
 
 -------------------------------------------------
--- MAIN LOOP
+-- AUTOFARM LOOP
 -------------------------------------------------
 task.spawn(function()
     while true do
         task.wait(0.35)
 
         local mallet = getMallet()
-
         if not mallet then
-            buyMallet(malletAmount)
-            task.wait(1.5)
-            mallet = getMallet()
-            if not mallet then
-                continue
-            end
+            task.wait(1)
+            continue
         end
 
         local stump = getNextStump()
