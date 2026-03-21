@@ -1,0 +1,220 @@
+-- Mochi Stump AutoFarm (FULLY FIXED BUY)
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Sugarfest Mochi AutoFarm",
+    LoadingTitle = "Loading Mochi Module",
+    LoadingSubtitle = "Buy Fixed",
+    ConfigurationSaving = { Enabled = false }
+})
+
+local MainTab = Window:CreateTab("AutoFarm", 4483362458)
+
+-------------------------------------------------
+-- SERVICES
+-------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-------------------------------------------------
+-- REMOTES
+-------------------------------------------------
+local hitRemote = ReplicatedStorage:WaitForChild("adoptme_new_net")
+    :WaitForChild("adoptme_legacy_shared.ContentPacks.Sugarfest2026.Game.MochiCat.MochiCatNet:11")
+
+-------------------------------------------------
+-- MODULES
+-------------------------------------------------
+local Fsys = require(ReplicatedStorage:WaitForChild("Fsys"))
+local ClientData = Fsys.load("ClientData")
+local RouterClient = Fsys.load("RouterClient")
+local NailHelper = require(ReplicatedStorage.SharedModules.ContentPacks.Sugarfest2026.Game.MochiCat.MochiNailOrderHelper)
+
+-------------------------------------------------
+-- VARIABLES
+-------------------------------------------------
+local farming = false
+local malletAmount = 1
+
+-------------------------------------------------
+-- ✅ BUY FUNCTION (FIXED)
+-------------------------------------------------
+local function buyMallet(amount)
+    amount = tonumber(amount) or 1
+
+    local success, result = pcall(function()
+        return RouterClient.get("ShopAPI/BuyItem"):InvokeServer(
+            "gifts",
+            "sugarfest_2026_mochi_mallet",
+            {
+                buy_count = amount
+            }
+        )
+    end)
+
+    if success and result == "success" then
+        Rayfield:Notify({
+            Title = "AutoBuy",
+            Content = "Bought " .. amount .. " mallet(s)",
+            Duration = 3
+        })
+    else
+        warn("Buy failed:", result)
+    end
+end
+
+-------------------------------------------------
+-- GET MALLET FROM INVENTORY
+-------------------------------------------------
+local function getMallet()
+    local inv = ClientData.get("inventory")
+    if not inv or not inv.gifts then return nil end
+
+    for _, item in pairs(inv.gifts) do
+        if item.kind == "sugarfest_2026_mochi_mallet" then
+            return item.unique_id or item.unique
+        end
+    end
+end
+
+-------------------------------------------------
+-- GET NEXT STUMP
+-------------------------------------------------
+local function getNextStump()
+    local interiors = workspace:FindFirstChild("Interiors")
+    if not interiors then return nil end
+
+    local map = interiors:FindFirstChild("MainMap!Sugarfest2026")
+    if not map then return nil end
+
+    local field = map:FindFirstChild("Event")
+        and map.Event:FindFirstChild("Sugarfest")
+        and map.Event.Sugarfest:FindFirstChild("MochiField")
+
+    if not field then return nil end
+
+    local nails = field:FindFirstChild("Nails")
+    if not nails then return nil end
+
+    local _, ordered = NailHelper.get_ordered_nails(nails)
+    local hpData = ClientData.get("mochi_stump_hp") or {}
+
+    for _, id in ipairs(ordered) do
+        local hp = hpData[id]
+        if (hp == nil and 3 or hp) > 0 then
+            return id
+        end
+    end
+end
+
+-------------------------------------------------
+-- AUTOFARM LOOP
+-------------------------------------------------
+task.spawn(function()
+    while true do
+        task.wait(0.35) -- faster farming
+
+        if not farming then
+            continue
+        end
+
+        local mallet = getMallet()
+
+        -------------------------------------------------
+        -- AUTO BUY IF NONE
+        -------------------------------------------------
+        if not mallet then
+            buyMallet(malletAmount)
+            task.wait(1.5)
+
+            mallet = getMallet()
+            if not mallet then
+                warn("No mallet after buying")
+                continue
+            end
+        end
+
+        -------------------------------------------------
+        -- GET TARGET
+        -------------------------------------------------
+        local stump = getNextStump()
+
+        if not stump then
+            Rayfield:Notify({
+                Title = "AutoFarm",
+                Content = "All stumps cleared",
+                Duration = 3
+            })
+            farming = false
+            continue
+        end
+
+        -------------------------------------------------
+        -- HIT STUMP
+        -------------------------------------------------
+        local result = hitRemote:InvokeServer({
+            stump_id = stump,
+            item_unique_id = mallet
+        })
+
+        if result and result.success then
+            print("Hit stump", stump, "HP:", result.hp)
+        else
+            warn("Hit failed:", result and result.reason)
+            task.wait(0.8)
+        end
+    end
+end)
+
+-------------------------------------------------
+-- UI
+-------------------------------------------------
+
+MainTab:CreateToggle({
+    Name = "Enable AutoFarm",
+    CurrentValue = false,
+    Callback = function(Value)
+        farming = Value
+    end
+})
+
+MainTab:CreateInput({
+    Name = "Mallet Amount",
+    PlaceholderText = "Enter amount",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        local num = tonumber(Text)
+        malletAmount = (num and num > 0) and num or 1
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Buy Mallet",
+    Callback = function()
+        buyMallet(malletAmount)
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Teleport to Mochi Field",
+    Callback = function()
+        local tp = ReplicatedStorage:WaitForChild("adoptme_new_net")
+            :WaitForChild("adoptme_legacy_shared.ContentPacks.Sugarfest2026.Game.MochiCat.MochiCatNet:9")
+
+        tp:FireServer()
+    end
+})
+
+MainTab:CreateKeybind({
+    Name = "Toggle Autofarm",
+    CurrentKeybind = "F",
+    HoldToInteract = false,
+    Callback = function()
+        farming = not farming
+        Rayfield:Notify({
+            Title = "AutoFarm",
+            Content = farming and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+})
