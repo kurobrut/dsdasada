@@ -482,7 +482,9 @@ local function loadMain()
 				end
 				if v.text then
 					pcall(function()
-						router.get("HousingAPI/ActivateFurniture"):InvokeServer(plr, i, "UseBlock", v.text, plr.Character)
+						router
+							.get("HousingAPI/ActivateFurniture")
+							:InvokeServer(plr, i, "UseBlock", v.text, plr.Character)
 					end)
 				elseif v.outfit_name then
 					pcall(function()
@@ -632,7 +634,9 @@ local function loadMain()
 				end
 				if v.text then
 					pcall(function()
-						router.get("HousingAPI/ActivateFurniture"):InvokeServer(plr, i, "UseBlock", v.text, plr.Character)
+						router
+							.get("HousingAPI/ActivateFurniture")
+							:InvokeServer(plr, i, "UseBlock", v.text, plr.Character)
 					end)
 				elseif v.outfit_name then
 					pcall(function()
@@ -816,7 +820,9 @@ local function loadMain()
 				end
 				if v.text then
 					pcall(function()
-						router.get("HousingAPI/ActivateFurniture"):InvokeServer(plr, i, "UseBlock", v.text, plr.Character)
+						router
+							.get("HousingAPI/ActivateFurniture")
+							:InvokeServer(plr, i, "UseBlock", v.text, plr.Character)
 					end)
 				elseif v.outfit_name then
 					pcall(function()
@@ -1014,11 +1020,6 @@ local function loadMain()
 
 	local TradeRequestEvent = router.get_event("TradeAPI/TradeRequestReceived")
 
-	--// DEBUG
-	local function debugPrint(...)
-		print("[AUTO TRADE]:", ...)
-	end
-
 	--// SAFE PLAYER RESOLVER
 	local function resolvePlayer(obj)
 		if typeof(obj) == "Instance" and obj:IsA("Player") then
@@ -1031,9 +1032,9 @@ local function loadMain()
 		return nil
 	end
 
-	--// GET PLAYERS
+	--// GET PLAYERS (None always first)
 	local function getPlayers()
-		local t = {}
+		local t = { "None" }
 
 		for _, plr in ipairs(Players:GetPlayers()) do
 			if plr ~= Players.LocalPlayer then
@@ -1041,8 +1042,8 @@ local function loadMain()
 			end
 		end
 
-		if #t == 0 then
-			t = {"No Players"}
+		if #t == 1 then
+			table.insert(t, "No Players Online")
 		end
 
 		return t
@@ -1052,22 +1053,20 @@ local function loadMain()
 	local PlayerDropdown = Tab:CreateDropdown({
 		Name = "Select Player",
 		Options = getPlayers(),
-		CurrentOption = getPlayers()[1],
+		CurrentOption = "None",
 		MultipleOptions = false,
 		Callback = function(option)
 			local value = (typeof(option) == "table") and option[1] or option
 
-			if value == "No Players" then
+			if value == "None" or value == "No Players Online" then
 				selectedPlayer = nil
 			else
 				selectedPlayer = value
 			end
-
-			debugPrint("Selected:", selectedPlayer)
-		end
+		end,
 	})
 
-	--// REFRESH FUNCTION (✅ FIXED)
+	--// REFRESH FUNCTION
 	local function refreshPlayers()
 		local players = getPlayers()
 
@@ -1075,14 +1074,14 @@ local function loadMain()
 			PlayerDropdown:Refresh(players)
 		end)
 
-		-- clear selection if player left
-		if selectedPlayer and not table.find(players, selectedPlayer) then
-			debugPrint("Selected player left → cleared")
+		-- Keep current selection if still valid, otherwise stay on None
+		if not selectedPlayer or not table.find(players, selectedPlayer) then
 			selectedPlayer = nil
+			PlayerDropdown:Set("None")
 		end
 	end
 
-	--// INPUT
+	--// INPUT - FIXED (no longer forces dropdown to show typed name)
 	Tab:CreateInput({
 		Name = "Type Player Name",
 		PlaceholderText = "Enter username...",
@@ -1090,63 +1089,53 @@ local function loadMain()
 		Callback = function(text)
 			if text ~= "" then
 				selectedPlayer = text
-
 				Rayfield:Notify({
 					Title = "Player Set",
 					Content = "Now accepting: " .. text,
-					Duration = 3
+					Duration = 3,
 				})
+				-- Removed PlayerDropdown:Set(text) ← this was causing "None" to appear
 			else
 				selectedPlayer = nil
+				PlayerDropdown:Set("None")
 			end
-		end
+		end,
 	})
 
-	--// REFRESH BUTTON (✅ FIXED)
+	--// REFRESH BUTTON
 	Tab:CreateButton({
 		Name = "Refresh Players",
 		Callback = function()
 			refreshPlayers()
-
 			Rayfield:Notify({
 				Title = "Players Refreshed",
 				Content = "List updated",
-				Duration = 3
+				Duration = 3,
 			})
-		end
+		end,
 	})
 
 	--// EVENT LISTENER
 	TradeRequestEvent.OnClientEvent:Connect(function(...)
-		if not autoTradeEnabled then return end
-		if not selectedPlayer then return end
-
-		local args = {...}
-		debugPrint("Event args:", unpack(args))
-
-		local player = resolvePlayer(args[1])
-
-		if not player then
-			debugPrint("Could not resolve sender")
+		if not autoTradeEnabled then
+			return
+		end
+		if not selectedPlayer then
 			return
 		end
 
-		debugPrint("Incoming trade from:", player.Name)
+		local args = { ... }
+		local player = resolvePlayer(args[1])
 
-		if string.lower(player.Name) == string.lower(selectedPlayer) then
-			debugPrint("MATCH → ACCEPTING")
-
+		if player and string.lower(player.Name) == string.lower(selectedPlayer) then
 			local remote = router.get("TradeAPI/AcceptOrDeclineTradeRequest")
-
 			if remote then
 				pcall(function()
 					remote:FireServer(player, true)
 				end)
-
 				pcall(function()
 					remote:InvokeServer(player, true)
 				end)
-
 				pcall(function()
 					remote:FireServer(true)
 				end)
@@ -1157,15 +1146,12 @@ local function loadMain()
 	--// AUTO NEGOTIATE LOOP
 	task.spawn(function()
 		while true do
-			task.wait(1)
-
+			task.wait(0.5)
 			if autoTradeEnabled and selectedPlayer then
 				pcall(function()
 					router.get("TradeAPI/AcceptNegotiation"):FireServer()
 				end)
-
-				task.wait(1)
-
+				task.wait(0.5)
 				pcall(function()
 					router.get("TradeAPI/ConfirmTrade"):FireServer()
 				end)
@@ -1179,16 +1165,15 @@ local function loadMain()
 		CurrentValue = false,
 		Callback = function(val)
 			autoTradeEnabled = val
-
 			Rayfield:Notify({
 				Title = "Auto Trade",
 				Content = val and ("Enabled for: " .. (selectedPlayer or "None")) or "Disabled",
-				Duration = 3
+				Duration = 3,
 			})
-		end
+		end,
 	})
 
-	--// AUTO UPDATE (✅ FIXED)
+	--// AUTO UPDATE
 	Players.PlayerAdded:Connect(function()
 		task.wait(0.3)
 		refreshPlayers()
@@ -1488,99 +1473,99 @@ local function loadMain()
 		RemoveTextAfterFocusLost = false,
 		Callback = function() end,
 	})
+	--==================================================
+	-- LOAD HOUSE FROM PASTEBIN (NOW AUTO-LOADED ON ENTER)
+	--==================================================
+	local function LoadHouseFromPastebin(pasteValue)
+		local input = tostring(pasteValue or ""):gsub("%s+", "") -- clean whitespace
+		if input == "" then
+			return Rayfield:Notify({
+				Title = "Error",
+				Content = "Please enter a Pastebin link or ID",
+				Duration = 3,
+			})
+		end
+
+		local pasteId = input:match("pastebin%.com/(.+)")
+		if pasteId then
+			pasteId = pasteId:gsub("raw/", "")
+		else
+			pasteId = input
+		end
+
+		local response
+		local success = pcall(function()
+			response = HttpService:RequestAsync({
+				Url = "https://pastebin.com/raw/" .. pasteId,
+				Method = "GET",
+			})
+			if response then
+				response.Body = response.Body or ""
+			end
+		end)
+
+		if not success or not response or not response.Body then
+			return Rayfield:Notify({
+				Title = "Error",
+				Content = "Failed to fetch Pastebin data",
+				Duration = 3,
+			})
+		end
+
+		local ok, decoded = pcall(function()
+			return HttpService:JSONDecode(response.Body)
+		end)
+		if not ok or type(decoded) ~= "table" then
+			return Rayfield:Notify({
+				Title = "Error",
+				Content = "Invalid Pastebin JSON",
+				Duration = 3,
+			})
+		end
+
+		-- Convert if it's the other cloner format
+		decoded = convertToInternalFormat(decoded)
+		savedhouse = deserialize(decoded)
+
+		local furniturecost = 0
+		for _, v in pairs(savedhouse.furniture or {}) do
+			if furnituresdb[v.id] then
+				furniturecost += furnituresdb[v.id].cost or 0
+			end
+		end
+		local texturecost = 0
+		for _, v in pairs(savedhouse.textures or {}) do
+			if texturesdb.walls[v.walls] then
+				texturecost += texturesdb.walls[v.walls].cost or 0
+			end
+			if texturesdb.floors[v.floors] then
+				texturecost += texturesdb.floors[v.floors].cost or 0
+			end
+		end
+		local t_count = counttextures(savedhouse.textures)
+		local amb = savedhouse.ambiance and "Yes" or "No"
+		local typ = savedhouse.building_type or "-"
+		task.spawn(setscaninfo, countfurnitures(savedhouse.furniture), furniturecost, t_count, texturecost, amb, typ)
+
+		Rayfield:Notify({
+			Title = "Success",
+			Content = "House loaded from Pastebin",
+			Duration = 3,
+			Image = "circle-check",
+		})
+	end
+
 	local pastebinInput = PastebinTab:CreateInput({
 		Name = "Pastebin Link / ID",
 		PlaceholderText = "https://pastebin.com/xxxxxx or xxxxxx",
 		RemoveTextAfterFocusLost = false,
-		Callback = function() end,
-	})
-	--==================================================
-	-- LOAD HOUSE FROM PASTEBIN
-	--==================================================
-	PastebinTab:CreateButton({
-		Name = "Load House from Pastebin",
-		Callback = function()
-			local input = pastebinInput.CurrentValue
-			if not input or input == "" then
-				return Rayfield:Notify({
-					Title = "Error",
-					Content = "Please enter a Pastebin link or ID",
-					Duration = 3,
-				})
-			end
-			local pasteId = input:match("pastebin%.com/(.+)")
-			if pasteId then
-				pasteId = pasteId:gsub("raw/", "")
-			else
-				pasteId = input
-			end
-			local response
-			local success = pcall(function()
-				response = HttpService:RequestAsync({
-					Url = "https://pastebin.com/raw/" .. pasteId,
-					Method = "GET",
-				})
-				if response then
-					response.Body = response.Body or ""
-				end
-			end)
-			if not success or not response or not response.Body then
-				return Rayfield:Notify({
-					Title = "Error",
-					Content = "Failed to fetch Pastebin data",
-					Duration = 3,
-				})
-			end
-			local ok, decoded = pcall(function()
-				return HttpService:JSONDecode(response.Body)
-			end)
-			if not ok or type(decoded) ~= "table" then
-				return Rayfield:Notify({
-					Title = "Error",
-					Content = "Invalid Pastebin JSON",
-					Duration = 3,
-				})
-			end
-			-- Convert if it's the other cloner format
-			decoded = convertToInternalFormat(decoded)
-			savedhouse = deserialize(decoded)
-			local furniturecost = 0
-			for _, v in pairs(savedhouse.furniture or {}) do
-				if furnituresdb[v.id] then
-					furniturecost += furnituresdb[v.id].cost or 0
-				end
-			end
-			local texturecost = 0
-			for _, v in pairs(savedhouse.textures or {}) do
-				if texturesdb.walls[v.walls] then
-					texturecost += texturesdb.walls[v.walls].cost or 0
-				end
-				if texturesdb.floors[v.floors] then
-					texturecost += texturesdb.floors[v.floors].cost or 0
-				end
-			end
-			local t_count = counttextures(savedhouse.textures)
-			local amb = savedhouse.ambiance and "Yes" or "No"
-			local typ = savedhouse.building_type or "-"
-			task.spawn(
-				setscaninfo,
-				countfurnitures(savedhouse.furniture),
-				furniturecost,
-				t_count,
-				texturecost,
-				amb,
-				typ
-			)
-			Rayfield:Notify({
-				Title = "Success",
-				Content = "House loaded from Pastebin",
-				Duration = 3,
-				Image = "circle-check",
-			})
+		Callback = function(value)
+			LoadHouseFromPastebin(value)
 		end,
 	})
+
 	--==================================================
-	-- SAVE HOUSE TO PASTEBIN
+	-- SAVE HOUSE TO PASTEBIN (unchanged)
 	--==================================================
 	PastebinTab:CreateButton({
 		Name = "Save House to Pastebin",
@@ -1706,22 +1691,27 @@ local function loadMain()
 			})
 		end,
 	})
+
 	local CreateFileTab = Window:CreateTab("Create File", "folder")
+
 	-- Ensure folder exists
-	if not isfolder("Cubixhouses") then
-		makefolder("Cubixhouses")
+	if not isfolder("HouseFS") then
+		makefolder("HouseFS")
 	end
+
 	-- UI Section
 	local FileSection = CreateFileTab:CreateSection("Saved Houses")
+
 	-- Dropdown for saved houses
 	local fileDropdown = CreateFileTab:CreateDropdown({
 		Name = "Select Saved House",
-		Options = {}, -- populated dynamically
+		Options = {},
 		CurrentOption = nil,
 		MultipleOptions = false,
 		Flag = "FileDropdown",
 		Callback = function(_) end,
 	})
+
 	-- Input for new save
 	local saveInput = CreateFileTab:CreateInput({
 		Name = "Save As",
@@ -1729,26 +1719,59 @@ local function loadMain()
 		RemoveTextAfterFocusLost = false,
 		Callback = function(_) end,
 	})
-	-- Utility: refresh dropdown
+
+	-- Variable to remember what file is currently selected
+	local pendingDelete = nil
+
+	-- ==================== IMPROVED NATURAL SORT (CASE-INSENSITIVE A-Z) ====================
+	-- Now sorts A-Z regardless of uppercase/lowercase (House, house, HOUSE all treated the same)
+	local function naturalSort(a, b)
+		local function pad(n)
+			return ("%010d"):format(tonumber(n) or 0)
+		end
+		-- Convert both to lowercase for true A-Z sorting
+		local la = a:lower()
+		local lb = b:lower()
+		local na = la:gsub("%d+", pad)
+		local nb = lb:gsub("%d+", pad)
+		return na < nb
+	end
+
+	-- Utility: refresh dropdown (sorted naturally + case-insensitive + keeps selection)
 	local function refreshFileDropdown()
-		local files = listfiles("Cubixhouses")
+		local files = listfiles("HouseFS")
 		local validFiles = {}
+
 		for _, filePath in ipairs(files) do
 			local fileName = filePath:match("^.+/(.+)$") or filePath
-			-- Updated: Support .json, .txt, and .lua files
 			if fileName:sub(-5) == ".json" or fileName:sub(-4) == ".txt" or fileName:sub(-4) == ".lua" then
 				table.insert(validFiles, fileName)
 			end
 		end
+
+		table.sort(validFiles, naturalSort)
+
+		-- Remember currently selected file
+		local currentlySelected = fileDropdown.CurrentOption
+		if type(currentlySelected) == "table" then
+			currentlySelected = currentlySelected[1]
+		end
+
 		fileDropdown:Refresh(validFiles)
-		if #validFiles > 0 then
+
+		-- Keep the same file selected after refresh
+		if currentlySelected and table.find(validFiles, currentlySelected) then
+			fileDropdown:Set(currentlySelected)
+		elseif #validFiles > 0 then
 			fileDropdown:Set(validFiles[1])
 		else
 			fileDropdown:Set(nil)
 		end
 	end
+
 	-- Initial refresh
 	refreshFileDropdown()
+
 	-- Button: Save House
 	CreateFileTab:CreateButton({
 		Name = "Save House to File",
@@ -1770,6 +1793,7 @@ local function loadMain()
 					Image = "circle-alert",
 				})
 			end
+
 			local clean_house = deepCopy(savedhouse)
 			local furniturecost = 0
 			for _, v in pairs(clean_house.furniture or {}) do
@@ -1820,6 +1844,7 @@ local function loadMain()
 			clean_house.textures_hash = nil
 			clean_house.player = nil
 			clean_house.music = nil
+
 			local function convert_colors_recursive(tbl)
 				if type(tbl) ~= "table" then
 					return tbl
@@ -1838,6 +1863,7 @@ local function loadMain()
 			if clean_house.ambiance then
 				clean_house.ambiance = convert_colors_recursive(clean_house.ambiance)
 			end
+
 			local success, encoded = pcall(function()
 				return HttpService:JSONEncode(clean_house)
 			end)
@@ -1849,7 +1875,8 @@ local function loadMain()
 					Image = "circle-alert",
 				})
 			end
-			writefile("Cubixhouses/" .. filename .. ".json", encoded)
+
+			writefile("HouseFS/" .. filename .. ".json", encoded)
 			refreshFileDropdown()
 			Rayfield:Notify({
 				Title = "Success",
@@ -1859,7 +1886,8 @@ local function loadMain()
 			})
 		end,
 	})
-	-- Function to convert other cloner JSON format to internal savedhouse format
+
+	-- Convert function (unchanged)
 	local function convertToInternalFormat(decoded)
 		if decoded.Furniture then
 			decoded.furnitures = decoded.Furniture
@@ -1882,7 +1910,7 @@ local function loadMain()
 			decoded.building_type = decoded.BuildType
 			decoded.BuildType = nil
 		end
-		-- Ignore ExData as costs are recalculated internally
+
 		if decoded.furnitures and #decoded.furnitures > 0 then
 			local function convertColors(obj)
 				if type(obj) ~= "table" then
@@ -1902,12 +1930,7 @@ local function loadMain()
 				for ck, cv in pairs(f.colors or {}) do
 					colors[ck] = cv
 				end
-				furniture[tostring(i)] = {
-					id = f.id,
-					cframe = f.cframe,
-					colors = colors,
-					scale = f.scale,
-				}
+				furniture[tostring(i)] = { id = f.id, cframe = f.cframe, colors = colors, scale = f.scale }
 			end
 			decoded.furniture = furniture
 			decoded.furnitures = nil
@@ -1942,37 +1965,30 @@ local function loadMain()
 		decoded.buildingType = nil
 		return decoded
 	end
-	-- Button: Load House
+
+	-- Button: Load House (keeps selection)
 	CreateFileTab:CreateButton({
 		Name = "Load House from File",
 		Callback = function()
 			local selected = fileDropdown.CurrentOption
-			-- Fix: if it's a table, get first value
 			if type(selected) == "table" then
 				selected = selected[1]
 			end
 			if not selected or selected == "" then
-				return Rayfield:Notify({
-					Title = "Error",
-					Content = "No file selected to load",
-					Duration = 3,
-				})
+				return Rayfield:Notify({ Title = "Error", Content = "No file selected to load", Duration = 3 })
 			end
-			local filePath = "Cubixhouses/" .. selected
+
+			local filePath = "HouseFS/" .. selected
 			local success, content = pcall(readfile, filePath)
 			if not success or not content then
-				return Rayfield:Notify({
-					Title = "Error",
-					Content = "Failed to read file: " .. selected,
-					Duration = 3,
-				})
+				return Rayfield:Notify({ Title = "Error", Content = "Failed to read file: " .. selected, Duration = 3 })
 			end
+
 			local decoded
 			local ok, err = pcall(function()
 				decoded = HttpService:JSONDecode(content)
 			end)
 			if not ok then
-				-- Try Lua format
 				local env = {
 					Vector3 = {
 						new = function(x, y, z)
@@ -2001,25 +2017,18 @@ local function loadMain()
 				setfenv(func, env)
 				local runok, data = pcall(func)
 				if not runok then
-					return Rayfield:Notify({
-						Title = "Error",
-						Content = "Run error: " .. tostring(data),
-						Duration = 3,
-					})
+					return Rayfield:Notify({ Title = "Error", Content = "Run error: " .. tostring(data), Duration = 3 })
 				end
 				decoded = data
 			end
+
 			if type(decoded) ~= "table" then
-				return Rayfield:Notify({
-					Title = "Error",
-					Content = "Invalid data in file: " .. selected,
-					Duration = 3,
-				})
+				return Rayfield:Notify({ Title = "Error", Content = "Invalid data in file: " .. selected, Duration = 3 })
 			end
-			-- Convert if it's the other cloner format
+
 			decoded = convertToInternalFormat(decoded)
 			savedhouse = deserialize(decoded)
-			-- Update costs
+
 			local furniturecost = 0
 			for _, v in pairs(savedhouse.furniture or {}) do
 				if furnituresdb[v.id] then
@@ -2047,48 +2056,71 @@ local function loadMain()
 				amb,
 				typ
 			)
-			Rayfield:Notify({
-				Title = "Success",
-				Content = "House loaded from file: " .. selected,
-				Duration = 3,
-			})
+
+			Rayfield:Notify({ Title = "Success", Content = "House loaded from file: " .. selected, Duration = 3 })
+			refreshFileDropdown()
 		end,
 	})
-	-- Button: Delete House
+
+	-- Button: Delete House (with confirmation)
 	CreateFileTab:CreateButton({
 		Name = "Delete Selected House",
 		Callback = function()
 			local selected = fileDropdown.CurrentOption
-			-- Fix: if it's a table, get first value
 			if type(selected) == "table" then
 				selected = selected[1]
 			end
 			if not selected or selected == "" then
-				return Rayfield:Notify({
-					Title = "Error",
-					Content = "No house selected to delete.",
-					Duration = 3,
-				})
+				return Rayfield:Notify({ Title = "Error", Content = "No house selected to delete.", Duration = 3 })
 			end
-			local filePath = "Cubixhouses/" .. selected
-			if isfile(filePath) then
-				delfile(filePath)
-				Rayfield:Notify({
-					Title = "Deleted",
-					Content = selected .. " has been deleted.",
-					Duration = 3,
-				})
-				refreshFileDropdown()
+
+			if pendingDelete == selected then
+				local filePath = "HouseFS/" .. selected
+				if isfile(filePath) then
+					delfile(filePath)
+					Rayfield:Notify({
+						Title = "Deleted",
+						Content = selected .. " has been deleted.",
+						Duration = 3,
+						Image = "circle-check",
+					})
+					pendingDelete = nil
+					refreshFileDropdown()
+				else
+					Rayfield:Notify({ Title = "Error", Content = "File not found: " .. selected, Duration = 3 })
+				end
 			else
+				pendingDelete = selected
 				Rayfield:Notify({
-					Title = "Error",
-					Content = "File not found: " .. selected,
-					Duration = 3,
+					Title = "Confirm Delete",
+					Content = "Are you sure you want to delete **"
+						.. selected
+						.. "**?\n\nClick the Delete button again to confirm.",
+					Duration = 10,
+					Image = "circle-alert",
 				})
 			end
 		end,
 	})
+
+	-- Extra refresh button
+	CreateFileTab:CreateButton({
+		Name = "Refresh List",
+		Callback = function()
+			refreshFileDropdown()
+			Rayfield:Notify({
+				Title = "Refreshed",
+				Content = "File list updated and sorted (numbers first)",
+				Duration = 2,
+			})
+		end,
+	})
+	
 	local Teleport = Window:CreateTab("Teleport", "map-pin")
+
+	-- New section added above the teleport options
+	Teleport:CreateSection("House Teleports")
+
 	local function loadinterior(interiortype, name)
 		local load = require(game:GetService("ReplicatedStorage").Fsys).load
 		local interiors = load("InteriorsM")
@@ -2101,6 +2133,7 @@ local function loadMain()
 			enter("housing", "MainDoor", { house_owner = name })
 		end
 	end
+
 	local function getplayernames()
 		local players = Players:GetPlayers()
 		local names = table.create(#players)
@@ -2109,6 +2142,7 @@ local function loadMain()
 		end
 		return names
 	end
+
 	local selectedplayer = Teleport:CreateDropdown({
 		Name = "Select Player",
 		Options = getplayernames(),
@@ -2117,12 +2151,14 @@ local function loadMain()
 		Flag = "Dropdown1",
 		Callback = function(_) end,
 	})
+
 	Players.PlayerAdded:Connect(function()
 		selectedplayer:Refresh(getplayernames())
 	end)
 	Players.PlayerRemoving:Connect(function()
 		selectedplayer:Refresh(getplayernames())
 	end)
+
 	Teleport:CreateButton({
 		Name = "Enter House",
 		Callback = function()
@@ -2132,6 +2168,7 @@ local function loadMain()
 			end
 		end,
 	})
+
 	Teleport:CreateButton({
 		Name = "Teleport to My House",
 		Callback = function()
